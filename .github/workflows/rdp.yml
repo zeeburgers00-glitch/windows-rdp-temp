@@ -11,22 +11,50 @@ jobs:
       - name: Setup RDP + Tunnel
         shell: pwsh
         run: |
-          # ---- Password set karo ----
+          # ---- Password set ----
           $password = ConvertTo-SecureString "Rdp@12345" -AsPlainText -Force
           Set-LocalUser -Name "runneradmin" -Password $password
 
-          # ---- RDP enable karo ----
+          # ---- RDP enable ----
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
           Start-Service TermService
 
-          # ---- bore.pub tunnel (bina account ke) ----
+          # ---- bore.pub tunnel (free, no account) ----
           Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip" -OutFile bore.zip
           Expand-Archive bore.zip -DestinationPath . -Force
-          Start-Process -FilePath ".\bore.exe" -ArgumentList "local","3389","--to","bore.pub" -RedirectStandardOutput "bore.log" -NoNewWindow
 
-          Start-Sleep 20
-          Get-Content bore.log
+          $job = Start-Process -FilePath ".\bore.exe" -ArgumentList "local","3389","--to","bore.pub" -RedirectStandardOutput "bore.log" -RedirectError "bore.err" -PassThru -NoNewWindow
+
+          Start-Sleep 25
+          $tunnel = (Get-Content bore.log -Raw)
+          Write-Host "BORE OUTPUT: $tunnel"
+          Write-Host "BORE ERR: $(Get-Content bore.err -Raw)"
+
+          # extract host:port
+          if ($tunnel -match 'listening at ([a-z0-9\.\-]+:\d+)') {
+            $addr = $Matches[1]
+          } else {
+            $addr = $tunnel.Trim()
+          }
+
+          @"
+          ### RDP Connection Details
+          - **Address:** ``$addr``
+          - **Username:** ``runneradmin``
+          - **Password:** ``Rdp@12345``
+
+          Open **mstsc** -> paste the address above.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+          # also save to a file we can pull later
+          $addr | Out-File -FilePath "rdp_addr.txt"
+
+      - name: Upload address
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-address
+          path: rdp_addr.txt
 
       - name: Keep session alive
-        run: Start-Sleep -Seconds 340
+        run: Start-Sleep -Seconds 330
