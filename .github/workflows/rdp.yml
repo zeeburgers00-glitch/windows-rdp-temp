@@ -1,0 +1,32 @@
+name: Windows RDP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 350
+    steps:
+      - name: Setup RDP + Tunnel
+        shell: pwsh
+        run: |
+          # ---- Password set karo ----
+          $password = ConvertTo-SecureString "Rdp@12345" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $password
+
+          # ---- RDP enable karo ----
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Start-Service TermService
+
+          # ---- bore.pub tunnel (bina account ke) ----
+          Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip" -OutFile bore.zip
+          Expand-Archive bore.zip -DestinationPath . -Force
+          Start-Process -FilePath ".\bore.exe" -ArgumentList "local","3389","--to","bore.pub" -RedirectStandardOutput "bore.log" -NoNewWindow
+
+          Start-Sleep 20
+          Get-Content bore.log
+
+      - name: Keep session alive
+        run: Start-Sleep -Seconds 340
