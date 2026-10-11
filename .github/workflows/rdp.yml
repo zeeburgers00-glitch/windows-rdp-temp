@@ -24,12 +24,15 @@ jobs:
           Invoke-WebRequest -Uri "https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip" -OutFile bore.zip
           Expand-Archive bore.zip -DestinationPath . -Force
 
-          $job = Start-Process -FilePath ".\bore.exe" -ArgumentList "local","3389","--to","bore.pub" -RedirectStandardOutput "bore.log" -RedirectError "bore.err" -PassThru -NoNewWindow
+          $job = Start-Process -FilePath ".\bore.exe" -ArgumentList "local","3389","--to","bore.pub" -RedirectStandardOutput "bore.log" -RedirectStandardError "bore.err" -PassThru -NoNewWindow
 
           Start-Sleep 25
-          $tunnel = (Get-Content bore.log -Raw)
+          $tunnel = ""
+          if (Test-Path "bore.log") { $tunnel = (Get-Content bore.log -Raw) }
+          $errText = ""
+          if (Test-Path "bore.err") { $errText = (Get-Content bore.err -Raw) }
           Write-Host "BORE OUTPUT: $tunnel"
-          Write-Host "BORE ERR: $(Get-Content bore.err -Raw)"
+          Write-Host "BORE ERR: $errText"
 
           # extract host:port
           if ($tunnel -match 'listening at ([a-z0-9\.\-]+:\d+)') {
